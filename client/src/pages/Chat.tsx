@@ -10,6 +10,13 @@ interface Message {
   isError?: boolean;
 }
 
+const SUGGESTIONS = [
+  "Give me a clear summary of the key points in this PDF.",
+  "What are the most important topics discussed in this document?",
+  "Highlight some practical examples or use cases from the PDF.",
+  "Explain the complex parts of this document in simple terms.",
+];
+
 export default function Chat({ session }: { session: Session | null }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -34,10 +41,9 @@ export default function Chat({ session }: { session: Session | null }) {
     );
   }
 
-  // Sends the question and adds the answer (or the error) to the list.
-  async function handleSend(e: FormEvent) {
-    e.preventDefault();
-    const question = input.trim();
+  // Sends a question to the backend and adds the response to chat.
+  async function submitQuestion(questionText: string) {
+    const question = questionText.trim();
     if (!question || loading || !session) return;
     setInput("");
     setMessages((m) => [...m, { role: "user", text: question }]);
@@ -53,6 +59,11 @@ export default function Chat({ session }: { session: Session | null }) {
     }
   }
 
+  function handleSend(e: FormEvent) {
+    e.preventDefault();
+    submitQuestion(input);
+  }
+
   return (
     <div className="chat">
       <div className="chat-head">
@@ -62,7 +73,22 @@ export default function Chat({ session }: { session: Session | null }) {
 
       <div className="messages">
         {messages.length === 0 && (
-          <div className="empty">Your PDF is ready. Ask your first question below.</div>
+          <div className="empty-state">
+            <p className="empty-title">Your PDF is ready! Try one of these questions:</p>
+            <div className="prompt-chips">
+              {SUGGESTIONS.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  className="chip-btn"
+                  onClick={() => submitQuestion(s)}
+                  disabled={loading}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          </div>
         )}
         {messages.map((m, i) => (
           <div key={i} className={`msg ${m.role}${m.isError ? " error" : ""}`}>
