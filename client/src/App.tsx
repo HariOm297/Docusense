@@ -8,7 +8,7 @@ import Chat from "./pages/Chat";
 // Restores the last session so a page refresh keeps the chat.
 function loadSession(): Session | null {
   try {
-    const raw = sessionStorage.getItem("pdfo-session");
+    const raw = sessionStorage.getItem("Docusense-session");
     return raw ? (JSON.parse(raw) as Session) : null;
   } catch {
     return null;
@@ -23,7 +23,7 @@ export default function App() {
   function handleUploaded(s: Session) {
     setSession(s);
     try {
-      sessionStorage.setItem("pdfo-session", JSON.stringify(s));
+      sessionStorage.setItem("Docusense-session", JSON.stringify(s));
     } catch {
       // Storage can be blocked, the chat still works until refresh.
     }
