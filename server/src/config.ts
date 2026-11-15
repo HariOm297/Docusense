@@ -7,7 +7,7 @@ export const TOP_K = 4;
 
 export const EMBEDDING_MODEL = "gemini-embedding-001";
 export const EMBEDDING_DIMENSION = 3072; // Pinecone index dimension must match this
-export const CHAT_MODEL = "gemini-2.5-flash";
+export const CHAT_MODEL = "gemini-flash-latest"; // Alias that always points to the current Flash model
 
 // Reads a required env var or throws a clear error.
 export function requireEnv(name: string): string {

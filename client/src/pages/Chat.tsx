@@ -1,0 +1,100 @@
+import { useEffect, useRef, useState, FormEvent } from "react";
+import { Link } from "react-router-dom";
+import { askQuestion } from "../api";
+import type { Session } from "../api";
+
+interface Message {
+  role: "user" | "bot";
+  text: string;
+  sources?: string[];
+  isError?: boolean;
+}
+
+export default function Chat({ session }: { session: Session | null }) {
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  // Keeps the newest message in view.
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, loading]);
+
+  // Without a processed PDF there is nothing to chat with.
+  if (!session) {
+    return (
+      <div className="card">
+        <h1>Chat</h1>
+        <p className="hint">You have not uploaded a PDF yet.</p>
+        <div className="upload-actions">
+          <Link className="btn" to="/upload">Upload a PDF</Link>
+        </div>
+      </div>
+    );
+  }
+
+  // Sends the question and adds the answer (or the error) to the list.
+  async function handleSend(e: FormEvent) {
+    e.preventDefault();
+    const question = input.trim();
+    if (!question || loading || !session) return;
+    setInput("");
+    setMessages((m) => [...m, { role: "user", text: question }]);
+    setLoading(true);
+    try {
+      const res = await askQuestion(session.sessionId, question);
+      setMessages((m) => [...m, { role: "bot", text: res.answer, sources: res.sources }]);
+    } catch (err) {
+      const text = err instanceof Error ? err.message : "Something went wrong.";
+      setMessages((m) => [...m, { role: "bot", text, isError: true }]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="chat">
+      <div className="chat-head">
+        <span className="file">{session.fileName} ({session.chunks} chunks)</span>
+        <Link className="btn secondary" to="/upload">Upload another PDF</Link>
+      </div>
+
+      <div className="messages">
+        {messages.length === 0 && (
+          <div className="empty">Your PDF is ready. Ask your first question below.</div>
+        )}
+        {messages.map((m, i) => (
+          <div key={i} className={`msg ${m.role}${m.isError ? " error" : ""}`}>
+            <div className="bubble">{m.text}</div>
+            {m.sources && m.sources.length > 0 && (
+              <details className="sources">
+                <summary>Sources from your PDF ({m.sources.length})</summary>
+                {m.sources.map((s, j) => (
+                  <blockquote key={j}>{s}...</blockquote>
+                ))}
+              </details>
+            )}
+          </div>
+        ))}
+        {loading && (
+          <div className="status info">
+            <span className="spinner" /> Searching your PDF and thinking...
+          </div>
+        )}
+        <div ref={bottomRef} />
+      </div>
+
+      <form className="composer" onSubmit={handleSend}>
+        <input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder="Ask a question about your PDF"
+          maxLength={1000}
+          disabled={loading}
+        />
+        <button className="btn" type="submit" disabled={!input.trim() || loading}>Send</button>
+      </form>
+    </div>
+  );
+}
