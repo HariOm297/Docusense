@@ -3,13 +3,14 @@ export interface Session {
   sessionId: string;
   fileName: string;
   chunks: number;
+  fileCount?: number;
 }
 export interface ChatResult {
   answer: string;
   sources: string[];
 }
 
-export const MAX_PDF_BYTES = 4 * 1024 * 1024; // Matches the server limit
+export const MAX_PDF_BYTES = 4 * 1024 * 1024; // Matches the server limit (4MB)
 
 // Reads the JSON reply and turns any failure into a readable error.
 async function parse<T>(res: Response): Promise<T> {
@@ -20,8 +21,8 @@ async function parse<T>(res: Response): Promise<T> {
     // Platform errors (like 413) may not be JSON.
   }
   if (!res.ok) {
-    if (res.status === 413) throw new Error(data?.error || "PDF is too large. Max size is 4MB.");
-    if (res.status === 504) throw new Error(data?.error || "Processing took too long. Try a smaller PDF.");
+    if (res.status === 413) throw new Error(data?.error || "PDFs exceed the 4MB total limit.");
+    if (res.status === 504) throw new Error(data?.error || "Processing took too long. Try fewer or smaller PDFs.");
     throw new Error(data?.error || `Request failed (${res.status}). Please try again.`);
   }
   return data as T;
@@ -37,11 +38,16 @@ async function request<T>(url: string, init: RequestInit): Promise<T> {
   }
 }
 
-// Sends the PDF to the backend (relative /api path works locally and on Vercel).
-export function uploadPdf(file: File): Promise<Session> {
+// Sends one or more PDFs to the backend (relative /api path works locally and on Vercel).
+export function uploadPdfs(files: File[]): Promise<Session> {
   const form = new FormData();
-  form.append("file", file);
+  files.forEach((file) => form.append("files", file));
   return request<Session>("/api/upload", { method: "POST", body: form });
+}
+
+// Convenience wrapper for single PDF upload
+export function uploadPdf(file: File): Promise<Session> {
+  return uploadPdfs([file]);
 }
 
 // Asks a question about the uploaded PDF.

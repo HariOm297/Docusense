@@ -104,6 +104,23 @@ h2 { margin: 0 0 12px; }
 .dropzone strong { display: block; margin-bottom: 4px; }
 .upload-actions { margin-top: 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
 
+/* File list for multi-upload */
+.file-list { margin-top: 16px; display: flex; flex-direction: column; gap: 8px; }
+.file-list-header { display: flex; justify-content: space-between; font-size: 0.88rem; font-weight: 600; color: var(--muted); padding: 0 4px; }
+.file-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px; background: var(--bg); border: 1px solid var(--border);
+  border-radius: 10px; font-size: 0.92rem;
+}
+.file-info { display: flex; align-items: center; gap: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-name { font-weight: 500; max-width: 320px; overflow: hidden; text-overflow: ellipsis; }
+.file-size { color: var(--muted); font-size: 0.82rem; }
+.file-remove {
+  background: none; border: none; color: var(--muted); font-size: 1rem;
+  cursor: pointer; padding: 4px 8px; border-radius: 6px; line-height: 1;
+}
+.file-remove:hover { color: var(--error); background: var(--error-bg); }
+
 /* Status banners */
 .status { margin-top: 16px; padding: 12px 14px; border-radius: 10px; font-weight: 500; display: flex; gap: 10px; align-items: center; }
 .status.info { background: var(--info-bg); color: var(--brand-dark); }
