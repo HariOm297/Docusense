@@ -84,7 +84,10 @@ export async function answerQuestion(sessionId: string, question: string) {
     try {
       const answer = await generate(name, prompt);
       console.log(`Answered with ${name}`);
-      return { answer, sources: matches.map((d) => d.pageContent.slice(0, 200)) };
+      return {
+        answer,
+        sources: matches.map((d) => (d.metadata?.source ? `[${d.metadata.source}] ` : "") + d.pageContent.slice(0, 200)),
+      };
     } catch (e: any) {
       lastError = String(e?.message || e);
       console.error(`Model ${name} failed:`, lastError);

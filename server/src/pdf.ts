@@ -28,18 +28,13 @@ export async function extractText(buffer: Buffer): Promise<string> {
   return text;
 }
 
-// Splits text into overlapping chunks and enforces the chunk cap.
-export async function chunkText(text: string) {
+// Splits text into overlapping chunks and attaches source metadata.
+export async function chunkText(text: string, filename?: string) {
   const splitter = new RecursiveCharacterTextSplitter({
     chunkSize: CHUNK_SIZE,
     chunkOverlap: CHUNK_OVERLAP,
   });
-  const docs = await splitter.createDocuments([text]);
-  if (docs.length > MAX_CHUNKS) {
-    throw new AppError(
-      `This PDF is too long to process in time (${docs.length} chunks, max ${MAX_CHUNKS}). Try a shorter PDF.`,
-      413
-    );
-  }
+  const metadata = filename ? [{ source: filename }] : undefined;
+  const docs = await splitter.createDocuments([text], metadata);
   return docs;
 }

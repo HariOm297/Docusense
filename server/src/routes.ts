@@ -7,14 +7,14 @@ import { ingestChunks, answerQuestion } from "./rag";
 
 const router = Router();
 
-// Keeps the uploaded PDF in memory (serverless has no persistent disk).
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_PDF_BYTES, files: 1 } });
+// Keeps uploaded PDFs in memory (serverless has no persistent disk). Up to 5 files supported.
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_PDF_BYTES, files: 5 } });
 
 // Fails with a clear error if work runs past the serverless time budget.
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   let timer: NodeJS.Timeout;
   const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new AppError("This took too long to process. Try a smaller PDF.", 504)), ms);
+    timer = setTimeout(() => reject(new AppError("This took too long to process. Try fewer or smaller PDFs.", 504)), ms);
   });
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
@@ -24,23 +24,54 @@ router.get("/health", (_req, res) => {
   res.json({ ok: true });
 });
 
-// Upload: PDF -> text -> chunks -> embeddings -> Pinecone namespace.
+// Upload: Support single or multiple PDFs -> text -> chunks -> embeddings -> Pinecone namespace.
 router.post("/upload", (req: Request, res: Response, next: NextFunction) => {
-  upload.single("file")(req, res, async (err: any) => {
+  upload.any()(req, res, async (err: any) => {
     try {
       if (err) {
-        if (err.code === "LIMIT_FILE_SIZE") throw new AppError("PDF is too large. Max size is 4MB.", 413);
+        if (err.code === "LIMIT_FILE_SIZE") throw new AppError("Upload exceeds size limit (max 4MB total).", 413);
+        if (err.code === "LIMIT_FILE_COUNT") throw new AppError("Too many files. Max 5 PDFs allowed simultaneously.", 400);
         throw new AppError(err.message || "Upload failed.");
       }
-      if (!req.file) throw new AppError("No file received. Please choose a PDF.");
-      if (req.file.mimetype !== "application/pdf") throw new AppError("Only PDF files are allowed.");
 
-      const text = await extractText(req.file.buffer);
-      const docs = await chunkText(text);
+      const files = (req.files as Express.Multer.File[]) ?? [];
+      if (files.length === 0) throw new AppError("No files received. Please choose at least one PDF.");
+
+      // Verify total file size across all documents
+      const totalBytes = files.reduce((acc, f) => acc + f.size, 0);
+      if (totalBytes > MAX_PDF_BYTES) {
+        throw new AppError("Total size of PDFs exceeds 4MB. Try smaller files.", 413);
+      }
+
+      let allDocs: any[] = [];
+      const fileNames: string[] = [];
+
+      for (const file of files) {
+        if (file.mimetype !== "application/pdf" && !file.originalname.toLowerCase().endsWith(".pdf")) {
+          throw new AppError(`"${file.originalname}" is not a valid PDF file.`);
+        }
+        const text = await extractText(file.buffer);
+        const docs = await chunkText(text, file.originalname);
+        allDocs = allDocs.concat(docs);
+        fileNames.push(file.originalname);
+      }
+
+      if (allDocs.length === 0) {
+        throw new AppError("No readable text found in the provided PDF(s).");
+      }
+
       const sessionId = randomUUID(); // One Pinecone namespace per session
-      await withTimeout(ingestChunks(sessionId, docs), 50_000);
+      await withTimeout(ingestChunks(sessionId, allDocs), 50_000);
 
-      res.json({ sessionId, chunks: docs.length, fileName: req.file.originalname });
+      const displayName =
+        fileNames.length === 1 ? fileNames[0] : `${fileNames.length} PDFs (${fileNames.join(", ")})`;
+
+      res.json({
+        sessionId,
+        chunks: allDocs.length,
+        fileName: displayName,
+        fileCount: fileNames.length,
+      });
     } catch (e) {
       next(e);
     }
